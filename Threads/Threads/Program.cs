@@ -12,14 +12,11 @@ namespace Threads {
         private static int ocurrences = 0;
         private static object ocurrencesMutex = new object();
         private static HashSet<string> knownSites = new HashSet<string>();
-        private static int ThreadsRunning = 0;
-        private static AutoResetEvent done = new AutoResetEvent(false);
 
         static void Main(string[] args) {
             var begin = DateTime.UtcNow;
             knownSites.Add("");
             AnalyzeSite("", 3);
-            done.WaitOne();
             var end = DateTime.UtcNow;
             Console.WriteLine("Cont of word Game: " + ocurrences);
             Console.WriteLine("The request took " + (end - begin).TotalMilliseconds + " ms.");
@@ -35,17 +32,15 @@ namespace Threads {
             string content = "";
             using (var wc = new System.Net.WebClient()) {
                 try {
-                    //Console.WriteLine("Try Nr. " + (3 - trys) + ": Reading from " + ROOT_URL + urlPart);
                     content = wc.DownloadString(ROOT_URL + urlPart);
                 } catch (Exception e) {
                     Console.WriteLine(ROOT_URL + urlPart + ": " + e.Message);
                 }
             }
 
-            //var threads = new List<System.Threading.Thread>();
+            var tasks = new List<Task>();
 
             foreach (Match match in Regex.Matches(content, "href=\"/([^\"#\\?:.]*)[\"#\\?]")) {
-                //var link = ROOT_URL + match.Groups[1].Value;
                 lock (knownSites) {
                     if (knownSites.Contains(match.Groups[1].Value) || match.Groups[1].Value.Contains("node")) {
                         continue;
@@ -54,15 +49,12 @@ namespace Threads {
                     }
                 }
 
-                Interlocked.Increment(ref ThreadsRunning);
-                System.Threading.ThreadPool.QueueUserWorkItem(state => {
+                tasks.Add(Task.Run(() => {
                     AnalyzeSite(match.Groups[1].Value, trys);
-                    if (0 == Interlocked.Decrement(ref ThreadsRunning)) {
-                        done.Set();
-                    }
-                    
-                });
+                }));
             }
+
+            Task.WaitAll(tasks.ToArray());
             var count = Regex.Matches(content, "(?:^|\\W)Game(?:$|\\W)", RegexOptions.IgnoreCase).Count;
             Interlocked.Add(ref ocurrences, count);
             Console.WriteLine("Try Nr. " + (3 - trys) + ": Reading from " + ROOT_URL + urlPart + " Words " + count);
