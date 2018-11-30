@@ -18,13 +18,7 @@ namespace Threads {
         static void Main(string[] args) {
             var begin = DateTime.UtcNow;
             knownSites.Add("");
-            System.Threading.ThreadPool.QueueUserWorkItem(state => {
-                AnalyzeSite("", 3);
-                if (0 == Interlocked.Decrement(ref ThreadsRunning)) {
-                    done.Set();
-                }
-
-            });
+            AnalyzeSite("", 3);
             done.WaitOne();
             var end = DateTime.UtcNow;
             Console.WriteLine("Cont of word Game: " + ocurrences);
@@ -41,7 +35,7 @@ namespace Threads {
             string content = "";
             using (var wc = new System.Net.WebClient()) {
                 try {
-                    Console.WriteLine("Try Nr. " + (3 - trys) + ": Reading from " + ROOT_URL + urlPart);
+                    //Console.WriteLine("Try Nr. " + (3 - trys) + ": Reading from " + ROOT_URL + urlPart);
                     content = wc.DownloadString(ROOT_URL + urlPart);
                 } catch (Exception e) {
                     Console.WriteLine(ROOT_URL + urlPart + ": " + e.Message);
@@ -69,8 +63,9 @@ namespace Threads {
                     
                 });
             }
-
-            Interlocked.Add(ref ocurrences, Regex.Matches(content, "(?:^|\\W)Game(?:$|\\W)", RegexOptions.IgnoreCase).Count);
+            var count = Regex.Matches(content, "(?:^|\\W)Game(?:$|\\W)", RegexOptions.IgnoreCase).Count;
+            Interlocked.Add(ref ocurrences, count);
+            Console.WriteLine("Try Nr. " + (3 - trys) + ": Reading from " + ROOT_URL + urlPart + " Words " + count);
 
             return;
         }
